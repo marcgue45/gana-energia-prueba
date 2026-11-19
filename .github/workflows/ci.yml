@@ -75,7 +75,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - run: npm i -g vercel@latest
-      # Vercel comprueba que el entrypoint de la API (dist/index.js) exista antes de construir
+      # Vercel comprueba que el entrypoint de la API (dist/index.mjs) exista antes de construir
       - run: npm run build -w @leads/api
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}

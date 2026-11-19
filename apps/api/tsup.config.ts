@@ -6,6 +6,9 @@ export default defineConfig({
   format: 'esm',
   target: 'node22',
   clean: true,
+  // .mjs: Node lo trata como ES module sin depender de "type": "module" en un package.json
+  // (en Vercel la función se empaqueta sin el package.json de la API)
+  outExtension: () => ({ js: '.mjs' }),
   // @leads/shared se publica como TS fuente: se incluye en el bundle en vez de resolverlo en runtime
   noExternal: ['@leads/shared'],
 });

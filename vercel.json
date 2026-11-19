@@ -17,7 +17,7 @@
     "api": {
       "root": "apps/api",
       "framework": "fastify",
-      "entrypoint": "dist/index.js",
+      "entrypoint": "dist/index.mjs",
       "buildCommand": "npm run build"
     }
   },
