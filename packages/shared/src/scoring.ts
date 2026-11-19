@@ -27,12 +27,12 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-export function rateNewCustomer(lead: LeadScoringInput): Rating {
+export function rateNewCustomer(lead: Pick<LeadScoringInput, 'isNewCustomer'>): Rating {
   if (lead.isNewCustomer === null) return { value: 0, note: MISSING };
   return { value: lead.isNewCustomer ? 100 : 0 };
 }
 
-export function rateInterest(lead: LeadScoringInput): Rating {
+export function rateInterest(lead: Pick<LeadScoringInput, 'interest'>): Rating {
   if (lead.interest === null) return { value: 0, note: MISSING };
   if (!Number.isFinite(lead.interest)) return { value: 0, note: 'Valor no numérico' };
 
@@ -42,7 +42,7 @@ export function rateInterest(lead: LeadScoringInput): Rating {
   return { value, note };
 }
 
-export function rateSource(lead: LeadScoringInput): Rating {
+export function rateSource(lead: Pick<LeadScoringInput, 'source'>): Rating {
   if (lead.source === null) return { value: 0, note: MISSING };
   if (!Object.hasOwn(SOURCE_RATINGS, lead.source)) {
     return { value: 0, note: `Origen desconocido: ${lead.source}` };
@@ -50,7 +50,7 @@ export function rateSource(lead: LeadScoringInput): Rating {
   return { value: SOURCE_RATINGS[lead.source as LeadSource] };
 }
 
-export function rateAge(lead: LeadScoringInput, now: Date): Rating {
+export function rateAge(lead: Pick<LeadScoringInput, 'createdAt'>, now: Date): Rating {
   const ageMs = now.getTime() - lead.createdAt.getTime();
   if (!Number.isFinite(ageMs)) return { value: 0, note: 'Fecha inválida' };
 
@@ -58,6 +58,18 @@ export function rateAge(lead: LeadScoringInput, now: Date): Rating {
   const value = (1 - days / AGE_MAX_DAYS) * 100;
   const note = ageMs < 0 ? 'Fecha de creación futura, tratada como recién creado' : undefined;
   return { value, note };
+}
+
+// Valoraciones que solo dependen de los datos del lead (no de los pesos ni de la fecha).
+// Se guardan en columnas; el total se calcula en SQL con los pesos vigentes y la antigüedad.
+export type StoredRatings = Record<Exclude<CriterionKey, 'age'>, number>;
+
+export function rateLeadData(lead: Omit<LeadScoringInput, 'createdAt'>): StoredRatings {
+  return {
+    newCustomer: rateNewCustomer(lead).value,
+    interest: rateInterest(lead).value,
+    source: rateSource(lead).value,
+  };
 }
 
 export function toPriority(total: number): Priority {

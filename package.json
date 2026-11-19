@@ -11,6 +11,8 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:up": "docker compose up -d db",
+    "db:migrate": "npm run db:migrate -w @leads/api",
+    "db:seed": "npm run db:seed -w @leads/api",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down"
   },

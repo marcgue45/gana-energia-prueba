@@ -6,6 +6,7 @@ import {
   clamp,
   rateAge,
   rateInterest,
+  rateLeadData,
   rateNewCustomer,
   rateSource,
   scoreLead,
@@ -229,5 +230,24 @@ describe('scoreLead', () => {
     expect(scoreLead(lead, interestHeavy, NOW).total).toBeGreaterThan(
       scoreLead(lead, INITIAL_WEIGHTS, NOW).total,
     );
+  });
+});
+
+describe('rateLeadData', () => {
+  it('devuelve las valoraciones que no dependen de pesos ni fecha', () => {
+    expect(rateLeadData({ isNewCustomer: true, interest: INTEREST_MAX, source: 'web' })).toEqual({
+      newCustomer: 100,
+      interest: 100,
+      source: SOURCE_RATINGS.web,
+    });
+  });
+
+  it('coincide con las valoraciones del desglose de scoreLead', () => {
+    const lead = makeLead({ isNewCustomer: null, interest: 4, source: 'carrier-pigeon' });
+    const stored = rateLeadData(lead);
+    const { breakdown } = scoreLead(lead, INITIAL_WEIGHTS, NOW);
+    for (const key of ['newCustomer', 'interest', 'source'] as const) {
+      expect(stored[key]).toBe(breakdown.find((b) => b.criterion === key)!.rating);
+    }
   });
 });
