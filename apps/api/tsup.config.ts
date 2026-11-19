@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  // Servidor + scripts de BD (el contenedor `setup` de docker-compose los ejecuta antes de la API)
+  entry: { index: 'src/index.ts', migrate: 'src/db/migrate.ts', seed: 'src/db/seed.ts' },
   format: 'esm',
   target: 'node22',
   clean: true,

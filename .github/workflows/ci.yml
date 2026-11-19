@@ -1,0 +1,81 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un único despliegue a producción a la vez; un push nuevo no cancela uno a medias
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # CI: tipos, tests y compilación en cada push y pull request
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: leads
+          POSTGRES_PASSWORD: leads
+          POSTGRES_DB: leads
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U leads" --health-interval 2s --health-timeout 3s --health-retries 15
+    env:
+      # Los tests de integración crean y migran su propia BD (leads_test) en este servidor
+      DATABASE_URL: postgres://leads:leads@localhost:5432/leads
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build -w @leads/api
+      - run: npm run build -w @leads/web
+
+  # Las imágenes Docker también tienen que construir
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build
+
+  # CD: solo en main y solo si todo lo anterior ha pasado.
+  # Orden: migraciones → build → despliegue. Las migraciones se aplican antes que el código nuevo,
+  # así que deben ser compatibles con la versión anterior (expand/contract).
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, docker]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Migraciones en la BD de producción
+        run: npm run db:migrate -w @leads/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Datos de ejemplo (solo si la BD está vacía)
+        run: npm run db:seed -w @leads/api -- --if-empty
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: npm i -g vercel@latest
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        run: echo "url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"

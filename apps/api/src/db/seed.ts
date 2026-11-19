@@ -1,6 +1,7 @@
-// Datos de ejemplo reproducibles: npm run db:seed [-- <número de leads>]
+// Datos de ejemplo reproducibles: npm run db:seed [-- <número de leads>] [--if-empty]
 // Borra leads y agentes, restablece los pesos iniciales y genera datos con una semilla fija,
 // así que cada ejecución produce exactamente los mismos leads (salvo created_at, relativo a hoy).
+// --if-empty: no hace nada si ya hay agentes (Docker y despliegue: no borrar datos al reiniciar).
 import {
   DEFAULT_WEIGHTS,
   INTEREST_MAX,
@@ -13,7 +14,9 @@ import { sql } from 'drizzle-orm';
 import { db, pool } from './client.js';
 import { agents, leads, weights } from './schema.js';
 
-const LEAD_COUNT = Number(process.argv[2] ?? 500);
+const args = process.argv.slice(2);
+const IF_EMPTY = args.includes('--if-empty');
+const LEAD_COUNT = Number(args.find((a) => /^\d+$/.test(a)) ?? 500);
 const BATCH = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -32,6 +35,13 @@ const FIRST = ['Ana', 'Luis', 'María', 'Jorge', 'Carmen', 'Pablo', 'Lucía', 'D
 const LAST = ['Torres', 'Pérez', 'Ruiz', 'Sanz', 'Gil', 'Mora', 'Vega', 'Ramos', 'Prieto', 'Ortega', 'Navarro', 'Molina', 'Castro', 'Iglesias', 'Romero', 'Serrano', 'Blanco', 'Méndez', 'Cano', 'Delgado'];
 
 async function main() {
+  if (IF_EMPTY) {
+    const [existing] = await db.select({ id: agents.id }).from(agents).limit(1);
+    if (existing) {
+      console.log('La BD ya tiene datos: no se cargan los de ejemplo.');
+      return;
+    }
+  }
   const now = Date.now();
 
   await db.transaction(async (tx) => {

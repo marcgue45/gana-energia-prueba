@@ -10,23 +10,37 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U leads"]
+      # Por TCP: durante la inicialización el servidor temporal solo escucha en el socket local
+      test: ["CMD-SHELL", "pg_isready -U leads -h 127.0.0.1"]
       interval: 2s
       timeout: 3s
       retries: 15
 
-  api:
+  # Se ejecuta una vez y termina: aplica las migraciones y carga los datos de ejemplo
+  # solo si la BD está vacía (reiniciar el stack no borra nada).
+  # Va aparte de la API para que varias instancias de la API no intenten migrar a la vez.
+  setup:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    image: gana-leads-api
+    command: ["sh", "-c", "node dist/migrate.js && node dist/seed.js --if-empty"]
+    environment:
+      DATABASE_URL: postgres://leads:leads@db:5432/leads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: gana-leads-api
     environment:
       DATABASE_URL: postgres://leads:leads@db:5432/leads
       PORT: 3000
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
-      db:
-        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
 
   web:
     build:

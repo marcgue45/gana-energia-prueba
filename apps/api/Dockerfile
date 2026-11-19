@@ -17,6 +17,7 @@ COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci -w @leads/api --omit=dev && npm cache clean --force
 COPY --from=build /repo/apps/api/dist apps/api/dist
+COPY apps/api/drizzle apps/api/drizzle
 WORKDIR /repo/apps/api
 USER node
 EXPOSE 3000
